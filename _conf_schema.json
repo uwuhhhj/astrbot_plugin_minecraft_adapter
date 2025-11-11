@@ -45,7 +45,7 @@
   "reconnect_interval": {
     "type": "int",
     "description": "重连间隔(秒)",
-    "default": 5
+    "default": 15
   },
   "forward_chat_to_astrbot": {
     "type": "bool",
@@ -62,7 +62,7 @@
   "forward_target_session": {
     "type": "list",
     "description": "消息转发目标会话",
-    "hint": "格式: platform_name:message_type:session_id，例如 aiocqhttp:group:123456789。留空则不转发。",
+    "hint": "使用sid获取，例如 aiocqhttp:group:123456789。留空则不转发。",
     "default": []
   },
   "status_check_interval": {
@@ -74,13 +74,13 @@
   "auto_forward_prefix": {
     "type": "string",
     "description": "自动转发消息前缀",
-    "hint": "用户消息以此前缀开头时自动转发到 Minecraft 服务器（例如: #mc）。留空则禁用此功能。",
-    "default": ""
+    "hint": "用户消息以此前缀开头时自动转发到 Minecraft 服务器（例如: %）。留空则禁用此功能。",
+    "default": "%"
   },
   "auto_forward_sessions": {
     "type": "list",
     "description": "自动转发监听的会话",
-    "hint": "格式: platform_name:message_type:session_id，例如 aiocqhttp:group:123456789。留空则监听所有会话。",
+    "hint": "使用sid获取，例如 aiocqhttp:group:123456789。留空则监听所有会话。",
     "default": []
   }
 }
