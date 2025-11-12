@@ -22,6 +22,10 @@ from .websocket_client import WebSocketClient
 class MinecraftAdapter(Star):
     """Minecraft 服务器适配器插件"""
 
+    # 类级别的运行标志，确保只有一个实例在运行
+    _instance_running = False
+    _instance_lock = asyncio.Lock()
+
     def __init__(self, context: Context, config: dict):
         super().__init__(context)
         self.context = context
@@ -32,6 +36,7 @@ class MinecraftAdapter(Star):
         self.rest_client = RestApiClient(self.config)
         self.formatter = MessageFormatter()
         self.status_task: asyncio.Task | None = None
+        self._is_started = False
 
         # MC 群聊会话 ID（固定格式）
         self.mc_group_session_id = "minecraft:group:server"
@@ -41,13 +46,24 @@ class MinecraftAdapter(Star):
 
         # 启动插件
         if self.config.enabled and self.config.websocket_token:
-            asyncio.create_task(self._start())
-            logger.info("[MC适配器] 插件已启用，正在连接...")
-            self._log_config_info()
+            asyncio.create_task(self._safe_start())
         elif self.config.enabled:
             logger.warning("[MC适配器] 未配置 Token，请设置 websocket_token")
         else:
             logger.info("[MC适配器] 插件未启用")
+
+    async def _safe_start(self):
+        """安全启动，防止重复启动"""
+        async with MinecraftAdapter._instance_lock:
+            if MinecraftAdapter._instance_running:
+                logger.warning("[MC适配器] 已有实例在运行，跳过启动")
+                return
+
+            MinecraftAdapter._instance_running = True
+            self._is_started = True
+            logger.info("[MC适配器] 插件已启用，正在连接...")
+            self._log_config_info()
+            await self._start()
 
     def _register_ws_handlers(self):
         """注册 WebSocket 消息处理器"""
@@ -352,6 +368,11 @@ class MinecraftAdapter(Star):
     async def terminate(self):
         """插件停止时调用"""
         logger.info(f"[MC适配器] 正在停止: {id(self)}")
+
+        # 重置运行标志
+        async with MinecraftAdapter._instance_lock:
+            MinecraftAdapter._instance_running = False
+            self._is_started = False
 
         if self.status_task and not self.status_task.done():
             self.status_task.cancel()
