@@ -178,24 +178,28 @@ class WebSocketClient:
             data = json.loads(message)
             msg_type = data.get("type", "")
 
+            # 处理内置协议消息
             if msg_type == "auth_required":
-                # 发送认证
                 await self._send_auth()
+                return
 
             elif msg_type == "auth_success":
                 self.authenticated = True
                 logger.info("[MC适配器/WS] ✅ 认证成功")
+                return
 
             elif msg_type == "auth_failed":
                 logger.error("[MC适配器/WS] ❌ 认证失败，请检查 Token")
                 self.authenticated = False
                 self.running = False
+                return
 
             elif msg_type == "error":
                 error_msg = data.get("message", "Unknown error")
                 logger.error(f"[MC适配器/WS] 服务器错误: {error_msg}")
+                return
 
-            # 调用注册的处理器
+            # 协议处理完成后，进行外部事件分发
             if msg_type in self._message_handlers:
                 handler = self._message_handlers[msg_type]
                 await handler(data)

@@ -39,13 +39,24 @@ async def get_sender_display_name(event: AstrMessageEvent) -> str:
 
 
 def parse_command_args(message_str: str, command: str) -> str | None:
-    """从消息字符串中解析指令参数"""
-    mc_index = message_str.lower().find("mc")
-    if mc_index == -1:
+    """从消息字符串中解析指令参数
+
+    只匹配以 mc 开头（可能有前缀）的指令，避免误匹配消息中的 'mc' 字符
+    """
+    import re
+
+    # 标准化空格
+    message_str = " ".join(message_str.split())
+
+    # 查找 mc 作为独立词（前面是空格或开头）
+    mc_pattern = r"(?:^|\s)(mc)\s+" + re.escape(command) + r"(?:\s+|$)"
+    match = re.search(mc_pattern, message_str, re.IGNORECASE)
+
+    if not match:
         return None
 
-    after_mc = message_str[mc_index + 2 :].strip()
-    if not after_mc.lower().startswith(command):
-        return None
+    # 获取匹配位置后的所有内容
+    start_pos = match.end()
+    args = message_str[start_pos:].strip()
 
-    return after_mc[len(command) :].strip() or None
+    return args if args else None

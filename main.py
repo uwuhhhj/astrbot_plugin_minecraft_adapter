@@ -282,4 +282,5 @@ class MinecraftAdapter(Star):
                 pass
 
         await self.ws_client.stop()
+        await self.rest_client.close()
         logger.info("[MC适配器] 已停止")

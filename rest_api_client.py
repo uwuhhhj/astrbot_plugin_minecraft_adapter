@@ -17,6 +17,19 @@ class RestApiClient:
 
     def __init__(self, config: MinecraftAdapterConfig):
         self.config = config
+        self._session: aiohttp.ClientSession | None = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """获取或创建 ClientSession"""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def close(self):
+        """关闭 ClientSession"""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
 
     async def _request(
         self, endpoint: str, method: str = "GET", **kwargs
@@ -38,21 +51,17 @@ class RestApiClient:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.request(
-                    method, url, headers=headers, **kwargs
-                ) as resp:
-                    if resp.status == 200:
-                        response = await resp.json()
-                        # 如果响应包含 data 字段，返回 data
-                        if isinstance(response, dict) and "data" in response:
-                            return response["data"]
-                        return response
-                    else:
-                        logger.error(
-                            f"[MC适配器/REST] API 请求失败: HTTP {resp.status}"
-                        )
-                        return {"error": f"HTTP {resp.status}"}
+            session = await self._get_session()
+            async with session.request(method, url, headers=headers, **kwargs) as resp:
+                if resp.status == 200:
+                    response = await resp.json()
+                    # 如果响应包含 data 字段，返回 data
+                    if isinstance(response, dict) and "data" in response:
+                        return response["data"]
+                    return response
+                else:
+                    logger.error(f"[MC适配器/REST] API 请求失败: HTTP {resp.status}")
+                    return {"error": f"HTTP {resp.status}"}
 
         except aiohttp.ClientError as e:
             logger.error(f"[MC适配器/REST] 网络错误: {e}")

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .config import MinecraftAdapterConfig
 
 
 class MessageFormatter:
@@ -63,7 +66,10 @@ class MessageFormatter:
 
     @staticmethod
     def format_connection_info(
-        ws_connected: bool, ws_authenticated: bool, config, forward_targets_count: int
+        ws_connected: bool,
+        ws_authenticated: bool,
+        config: MinecraftAdapterConfig,
+        forward_targets_count: int,
     ) -> str:
         """格式化连接信息"""
         ws_status = (
