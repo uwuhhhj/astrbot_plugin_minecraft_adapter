@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ast
 import json
 import time
 from dataclasses import dataclass
@@ -51,7 +52,56 @@ def _as_list(value: object) -> list:
         return value
     if isinstance(value, str):
         s = value.strip()
-        return [s] if s else []
+        if not s:
+            return []
+
+        # Some config UIs store YAML/JSON lists as a single string, e.g.
+        # - ["main", "main_staging"]
+        # - "main", "main_staging"
+        # - - main\n  - main_staging
+        # Try to recover a list from common encodings.
+        try:
+            lit = ast.literal_eval(s)
+            if isinstance(lit, (list, tuple)):
+                items: list[str] = []
+                for x in lit:
+                    if x is None:
+                        continue
+                    xs = str(x).strip()
+                    if xs:
+                        items.append(xs)
+                return items
+        except Exception:
+            pass
+
+        inner = s
+        if s.startswith("[") and s.endswith("]"):
+            inner = s[1:-1].strip()
+
+        # YAML list in a string
+        if "\n" in inner and "-" in inner:
+            items: list[str] = []
+            for line in inner.splitlines():
+                line = line.strip()
+                if not line.startswith("-"):
+                    continue
+                item = line[1:].strip().strip('"').strip("'").strip()
+                if item:
+                    items.append(item)
+            if items:
+                return items
+
+        # CSV-ish: "main", "main_staging" or main, main_staging
+        if "," in inner:
+            items: list[str] = []
+            for part in inner.split(","):
+                p = part.strip().strip('"').strip("'").strip()
+                if p:
+                    items.append(p)
+            if items:
+                return items
+
+        return [s]
     return [value]
 
 
@@ -340,6 +390,33 @@ class MinecraftGatewayPlatformAdapter(Platform):
                     fut.set_result(payload)
             return
 
+        if msg_type == "BINDING_QUERY_RESPONSE":
+            reply_to = data.get("replyTo")
+            payload = data.get("payload") or {}
+            if reply_to and reply_to in conn.pending_by_reply_to:
+                fut = conn.pending_by_reply_to.pop(reply_to)
+                if not fut.done():
+                    fut.set_result(payload)
+            return
+
+        if msg_type == "LANDS_QUERY_RESPONSE":
+            reply_to = data.get("replyTo")
+            payload = data.get("payload") or {}
+            if reply_to and reply_to in conn.pending_by_reply_to:
+                fut = conn.pending_by_reply_to.pop(reply_to)
+                if not fut.done():
+                    fut.set_result(payload)
+            return
+
+        if msg_type == "PLAYTIME_QUERY_RESPONSE":
+            reply_to = data.get("replyTo")
+            payload = data.get("payload") or {}
+            if reply_to and reply_to in conn.pending_by_reply_to:
+                fut = conn.pending_by_reply_to.pop(reply_to)
+                if not fut.done():
+                    fut.set_result(payload)
+            return
+
         if msg_type == "MESSAGE_FORWARD":
             try:
                 payload = data.get("payload") or {}
@@ -408,6 +485,7 @@ class MinecraftGatewayPlatformAdapter(Platform):
 
     async def _commit_bind_code_event(self, conn: ServerConnection, data: dict) -> None:
         payload = data.get("payload") or {}
+        platform = (payload.get("platform") or "").strip().lower()
         code = payload.get("code") or ""
         player_uuid = payload.get("playerUuid") or ""
         player_name = payload.get("playerName") or "Unknown"
@@ -418,7 +496,8 @@ class MinecraftGatewayPlatformAdapter(Platform):
 
         # 私聊事件：session_id 带 serverId，避免多服冲突
         session_id = f"{conn.server_id}:{player_uuid}"
-        text = f"绑定码 {code}"
+        prefix = f"[{platform}] " if platform else ""
+        text = f"{prefix}绑定码 {code}"
 
         abm = AstrBotMessage()
         abm.type = MessageType.FRIEND_MESSAGE
@@ -448,6 +527,7 @@ class MinecraftGatewayPlatformAdapter(Platform):
             "binding",
             {
                 "server_id": conn.server_id,
+                "platform": platform,
                 "code": code,
                 "player_uuid": player_uuid,
                 "player_name": player_name,

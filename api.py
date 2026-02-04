@@ -56,3 +56,135 @@ async def send_bind_confirm(
 
 async def list_connected_server_ids() -> list[str]:
     return await list_server_ids()
+
+
+async def query_bindings(
+    server_id: str,
+    player_uuid: str,
+    *,
+    platform: str | None = None,
+    timeout_sec: float = 10.0,
+) -> dict:
+    """
+    由其它插件调用：向指定 MC 服务器查询玩家绑定信息，并等待返回。
+
+    返回示例（成功）：
+      {"success": True, "message": "ok", "playerUuid": "...", "bindings": [{"platform": "qq", "accountId": "..."}]}
+    """
+    conn = await get_connection(server_id)
+    if conn is None:
+        try:
+            connected = await list_server_ids()
+        except Exception:
+            connected = []
+        suffix = f" (connected: {', '.join(connected)})" if connected else " (connected: none)"
+        raise RuntimeError(f"minecraft server not connected: {server_id}{suffix}")
+
+    request_id = str(uuid4())
+    loop = asyncio.get_running_loop()
+    fut = loop.create_future()
+    conn.pending_by_reply_to[request_id] = fut
+
+    payload: dict = {"playerUuid": player_uuid}
+    if platform:
+        payload["platform"] = platform
+
+    msg = {
+        "type": "BINDING_QUERY_REQUEST",
+        "id": request_id,
+        "timestamp": int(time.time() * 1000),
+        "payload": payload,
+    }
+    await conn.websocket.send_json(msg)
+
+    try:
+        resp = await asyncio.wait_for(fut, timeout=timeout_sec)
+        logger.info("[MC-GW][BINDING_QUERY] server=%s resp=%s", server_id, resp)
+        return resp
+    finally:
+        conn.pending_by_reply_to.pop(request_id, None)
+
+
+async def query_lands(
+    server_id: str,
+    player_uuid: str,
+    *,
+    timeout_sec: float = 10.0,
+) -> dict:
+    """
+    Query Lands membership for a player (may belong to multiple lands).
+    Response example:
+      {"success": True, "message": "ok", "playerUuid": "...", "count": 2, "lands": [{"id": 1, "name": "Foo"}]}
+    """
+    conn = await get_connection(server_id)
+    if conn is None:
+        try:
+            connected = await list_server_ids()
+        except Exception:
+            connected = []
+        suffix = f" (connected: {', '.join(connected)})" if connected else " (connected: none)"
+        raise RuntimeError(f"minecraft server not connected: {server_id}{suffix}")
+
+    request_id = str(uuid4())
+    loop = asyncio.get_running_loop()
+    fut = loop.create_future()
+    conn.pending_by_reply_to[request_id] = fut
+
+    payload: dict = {"playerUuid": player_uuid}
+    msg = {
+        "type": "LANDS_QUERY_REQUEST",
+        "id": request_id,
+        "timestamp": int(time.time() * 1000),
+        "payload": payload,
+    }
+    await conn.websocket.send_json(msg)
+
+    try:
+        resp = await asyncio.wait_for(fut, timeout=timeout_sec)
+        logger.info("[MC-GW][LANDS_QUERY] server=%s resp=%s", server_id, resp)
+        return resp
+    finally:
+        conn.pending_by_reply_to.pop(request_id, None)
+
+
+async def query_playtime(
+    server_id: str,
+    player_uuid: str,
+    *,
+    timeout_sec: float = 10.0,
+) -> dict:
+    """
+    Query playtime (ticks) for a player on the given MC server.
+    Response example:
+      {"success": True, "message": "ok", "playerUuid": "...", "playtimeTicks": 123}
+    """
+    conn = await get_connection(server_id)
+    if conn is None:
+        try:
+            connected = await list_server_ids()
+        except Exception:
+            connected = []
+        suffix = f" (connected: {', '.join(connected)})" if connected else " (connected: none)"
+        raise RuntimeError(f"minecraft server not connected: {server_id}{suffix}")
+
+    request_id = str(uuid4())
+    loop = asyncio.get_running_loop()
+    fut = loop.create_future()
+    conn.pending_by_reply_to[request_id] = fut
+
+    payload: dict = {"playerUuid": player_uuid}
+
+    msg = {
+        "type": "PLAYTIME_QUERY_REQUEST",
+        "id": request_id,
+        "timestamp": int(time.time() * 1000),
+        "payload": payload,
+    }
+    await conn.websocket.send_json(msg)
+
+    try:
+        resp = await asyncio.wait_for(fut, timeout=timeout_sec)
+        logger.info("[MC-GW][PLAYTIME_QUERY] server=%s resp=%s", server_id, resp)
+        return resp
+    finally:
+        conn.pending_by_reply_to.pop(request_id, None)

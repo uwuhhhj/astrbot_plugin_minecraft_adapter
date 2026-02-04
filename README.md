@@ -14,7 +14,7 @@
 
 ## 绑定
 
-MC 侧生成绑定码后会推送 `BIND_CODE_ISSUED`，AstrBot 侧会建模为 **私聊事件**（`FriendMessage`），并在 `event.get_extra("binding")` 中附带结构化数据（含 `server_id/code/player_uuid/...`）。
+MC 侧生成绑定码后会推送 `BIND_CODE_ISSUED`，AstrBot 侧会建模为 **私聊事件**（`FriendMessage`），并在 `event.get_extra("binding")` 中附带结构化数据（含 `server_id/platform/code/player_uuid/...`）。
 
 其它插件可调用：
 
@@ -23,4 +23,3 @@ from astrbot_plugin_minecraft_adapter.api import send_bind_confirm
 
 await send_bind_confirm(server_id="ExampleServer", platform="kook", code="123456", account_id="xxx")
 ```
-
