@@ -188,3 +188,48 @@ async def query_playtime(
         return resp
     finally:
         conn.pending_by_reply_to.pop(request_id, None)
+
+
+async def query_player_by_external_account(
+    server_id: str,
+    *,
+    platform: str,
+    account_id: str,
+    timeout_sec: float = 10.0,
+) -> dict:
+    """
+    Query player info by external account (e.g. qq -> playerUuid/playerName/playtimeTicks).
+
+    Response example:
+      {"success": True, "message": "ok", "platform": "qq", "accountId": "123",
+       "playerUuid": "...", "playerName": "...", "playtimeTicks": 123}
+    """
+    conn = await get_connection(server_id)
+    if conn is None:
+        try:
+            connected = await list_server_ids()
+        except Exception:
+            connected = []
+        suffix = f" (connected: {', '.join(connected)})" if connected else " (connected: none)"
+        raise RuntimeError(f"minecraft server not connected: {server_id}{suffix}")
+
+    request_id = str(uuid4())
+    loop = asyncio.get_running_loop()
+    fut = loop.create_future()
+    conn.pending_by_reply_to[request_id] = fut
+
+    payload = {"platform": platform, "accountId": account_id}
+    msg = {
+        "type": "EXTERNAL_ACCOUNT_QUERY_REQUEST",
+        "id": request_id,
+        "timestamp": int(time.time() * 1000),
+        "payload": payload,
+    }
+    await conn.websocket.send_json(msg)
+
+    try:
+        resp = await asyncio.wait_for(fut, timeout=timeout_sec)
+        logger.info("[MC-GW][EXTERNAL_ACCOUNT_QUERY] server=%s resp=%s", server_id, resp)
+        return resp
+    finally:
+        conn.pending_by_reply_to.pop(request_id, None)
