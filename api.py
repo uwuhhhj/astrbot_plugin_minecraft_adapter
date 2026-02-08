@@ -231,5 +231,9 @@ async def query_player_by_external_account(
         resp = await asyncio.wait_for(fut, timeout=timeout_sec)
         logger.info("[MC-GW][EXTERNAL_ACCOUNT_QUERY] server=%s resp=%s", server_id, resp)
         return resp
+    except asyncio.TimeoutError as e:
+        raise RuntimeError(
+            f"timeout waiting for EXTERNAL_ACCOUNT_QUERY_RESPONSE from server: {server_id}"
+        ) from e
     finally:
         conn.pending_by_reply_to.pop(request_id, None)

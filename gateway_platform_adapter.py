@@ -417,6 +417,15 @@ class MinecraftGatewayPlatformAdapter(Platform):
                     fut.set_result(payload)
             return
 
+        if msg_type == "EXTERNAL_ACCOUNT_QUERY_RESPONSE":
+            reply_to = data.get("replyTo")
+            payload = data.get("payload") or {}
+            if reply_to and reply_to in conn.pending_by_reply_to:
+                fut = conn.pending_by_reply_to.pop(reply_to)
+                if not fut.done():
+                    fut.set_result(payload)
+            return
+
         if msg_type == "MESSAGE_FORWARD":
             try:
                 payload = data.get("payload") or {}
